@@ -41,6 +41,12 @@ webhooks:
       {{end}}
 ```
 
+## Roadmap
+
+- [ ] SMTP (email) notification
+- [ ] NATS notification
+- [ ] Success notification
+
 ## Deployment
 
 Kustomize is preferred.
