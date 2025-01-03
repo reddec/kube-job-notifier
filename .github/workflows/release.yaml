@@ -51,3 +51,6 @@ jobs:
           sed -i "s|latest|${GITHUB_REF#refs/*/v}|g" deploy/kustomization.yaml
           tar -C deploy/ -zcvf build-manifests/deploy.tar.gz .
           gh release upload "${GITHUB_REF#refs/*/}" build-manifests/*
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
