@@ -18,11 +18,6 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-        id: go
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
@@ -37,6 +32,11 @@ jobs:
         run: git lfs checkout
       - name: Pull tag
         run: git fetch --tags
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+        id: go
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
