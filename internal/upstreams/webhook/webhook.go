@@ -1,7 +1,9 @@
 package webhook
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -27,12 +29,29 @@ func (w Webhook) Send(ctx context.Context, info *config.RenderContext) error {
 		return fmt.Errorf("render url: %w", err)
 	}
 
-	payload, err := w.config.Body.Render(info)
+	payload, err := w.config.Body(info)
 	if err != nil {
 		return fmt.Errorf("render body: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, w.config.Method, url, strings.NewReader(payload))
+	var isJSON bool
+	var reader io.Reader
+	if v, ok := payload.(string); ok {
+		reader = strings.NewReader(v)
+	} else if v, ok := payload.(io.Reader); ok {
+		reader = v
+	} else if v, ok := payload.([]byte); ok {
+		reader = bytes.NewReader(v)
+	} else {
+		data, err := json.Marshal(payload)
+		if err != nil {
+			return fmt.Errorf("marshal payload: %w", err)
+		}
+		isJSON = true
+		reader = bytes.NewReader(data)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, w.config.Method, url, reader)
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
@@ -42,6 +61,10 @@ func (w Webhook) Send(ctx context.Context, info *config.RenderContext) error {
 			return fmt.Errorf("render header %q: %w", k, err)
 		}
 		req.Header.Set(k, content)
+	}
+
+	if isJSON && req.Header.Get("Content-Type") == "" {
+		req.Header.Set("Content-Type", "application/json")
 	}
 
 	resp, err := http.DefaultClient.Do(req)

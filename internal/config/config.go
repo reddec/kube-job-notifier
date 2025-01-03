@@ -55,12 +55,12 @@ type Webhook struct {
 	URL     *Template            `yaml:"url"`
 	Method  string               `yaml:"method,omitempty"`
 	Headers map[string]*Template `yaml:"headers,omitempty"`
-	Body    *Template            `yaml:"body,omitempty"`
+	Body    ComplexTemplate      `yaml:"body,omitempty"`
 }
 
 func (w *Webhook) Reset() {
 	*w = Webhook{
 		Method: http.MethodPost,
-		Body:   MustTemplate("Job {{.Job.Name}}\n\n{{range .Pods}}{{.Name}}\n\n{{.Logs}}\n\n\n{{end}}"),
+		Body:   MustComplexTemplate("Job {{.Job.Name}}\n\n{{range .Pods}}{{.Name}}\n\n{{.Logs}}\n\n\n{{end}}"),
 	}
 }

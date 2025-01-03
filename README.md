@@ -87,6 +87,67 @@ Optional variables that in 99.99% are not required for production deployment
 
 ### Rules
 
+
+If body is not text, it will be treated as templated object: 
+- every text field considered as template
+- it recursively applied for each item in array or record in map
+- object structure pre-reserved
+
+#### Examples
+
+**NTFY**
+
+```yaml
+---
+webhooks:
+  - url: https://ntfy.example.com/cron-jobs
+    headers:
+      Title: "{{or .Job.Labels.project .Job.Name}} failed"
+      Markdown: 'yes'
+      Priority: "high"
+      Tags': 'rotating_light'
+    body: |
+      {{range .Pods}}
+      ### Pod: {{.Name}}
+
+      ```
+      {{.Logs}}
+      ```
+
+      {{end}}
+```
+
+**Telegram**
+
+See [Bot API](https://core.telegram.org/bots/api#sendmessage)
+
+```yaml
+---
+webhooks:
+  - url: https://api.telegram.org/botXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX/sendMessage
+    body:
+      chat_id: 11111111111
+      text: |
+        {{or .Job.Labels.project .Job.Name}} failed
+
+
+        {{range .Pods}}
+        ### Pod: {{.Name}}
+
+        ```
+        {{.Logs}}
+        ```
+
+        {{end}}
+```
+
+- Create token from [Bot Father](https://t.me/BotFather)
+- Replace `XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX` to your token
+- Replace `11111111111` in chat ID to your chat (you can find it in [Get IDs bot](https://t.me/getidsbot)).
+
+> Instead of setting token in plain text, set value as environment variable (ex: `TELEGRAM_TOKEN`) in deployment and
+> wire it via template function (ex: `url: https://api.telegram.org/bot{{env "TELEGRAM_TOKEN"}}/sendMessage`)
+
 ### Template
 
 Based on [GoTemplates](https://pkg.go.dev/text/template). All functions
