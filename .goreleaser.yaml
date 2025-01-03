@@ -17,12 +17,16 @@ dockers:
   - image_templates:
       - "ghcr.io/reddec/{{ .ProjectName }}:{{ .Version }}-amd64"
     use: buildx
+    extra_files:
+      - deploy/config/rules.yaml
     dockerfile: Dockerfile
     build_flag_templates:
       - "--platform=linux/amd64"
   - image_templates:
       - "ghcr.io/reddec/{{ .ProjectName }}:{{ .Version }}-arm64v8"
     use: buildx
+    extra_files:
+      - deploy/config/rules.yaml
     goarch: arm64
     dockerfile: Dockerfile
     build_flag_templates:

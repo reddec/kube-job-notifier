@@ -37,8 +37,18 @@ spec:
                 resourceFieldRef:
                   resource: requests.memory
 
+          volumeMounts:
+            - name: rules
+              subPath: rules.yaml
+              mountPath: /etc/notify.yaml
+              readOnly: true
+
           resources:
             limits:
               memory: 128Mi
             requests:
-              memory: 16Mi
+              memory: 32Mi
+      volumes:
+        - name: rules
+          configMap:
+            name: kube-job-notifier-rules

@@ -55,6 +55,8 @@ curl -L https://github.com/reddec/kube-job-notifier/releases/latest/download/dep
 
 Or just use files from [deploy](deploy) directory.
 
+Both AMD64 and ARM64 supported.
+
 ## Configuration
 
 ### Deployment (service)

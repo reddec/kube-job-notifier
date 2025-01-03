@@ -4,6 +4,11 @@ resources:
   - role.yaml
   - deployment.yaml
 
+configMapGenerator:
+  - name: kube-job-notifier-rules
+    files:
+      - config/rules.yaml
+
 images:
   - name: kube-job-notifier
     newName: ghcr.io/reddec/kube-job-notifier
