@@ -3,6 +3,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: "kube-job-notifier"
+  namespace: kube-job-notifier
 spec:
   replicas: 1
   selector:

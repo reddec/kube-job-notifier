@@ -1,3 +1,5 @@
+namespace: kube-job-notifier
+
 resources:
   - ns.yaml
   - sa.yaml
