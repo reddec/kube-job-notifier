@@ -1,0 +1,7 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kube-job-notifier
+  namespace: kube-job-notifier
+automountServiceAccountToken: true

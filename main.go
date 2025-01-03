@@ -20,7 +20,7 @@ import (
 type Config struct {
 	Config string `short:"c" long:"config" env:"CONFIG" description:"Path to config file" default:"notify.yaml"`
 	// mimic std clientcmd
-	KubeConfig string `short:"C" long:"kubeconfig" env:"KUBECONFIG" description:"Path kubernetes config file for outside of cluster run"`
+	KubeConfig string `short:"C" long:"kubeconfig" env:"KUBECONFIG" description:"Path to kubernetes config file to run service outside of cluster"`
 	MasterURL  string `long:"master" env:"MASTER_URL" description:"Kuberentes master URL"`
 	// general config
 	Engine engine.Config `group:"Engine configuration" namespace:"engine" env-namespace:"ENGINE"`

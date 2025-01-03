@@ -1,0 +1,10 @@
+resources:
+  - ns.yaml
+  - sa.yaml
+  - role.yaml
+  - deployment.yaml
+
+images:
+  - name: kube-job-notifier
+    newName: ghcr.io/reddec/kube-job-notifier
+    newTag: latest

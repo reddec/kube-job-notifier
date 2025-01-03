@@ -1,0 +1,44 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "kube-job-notifier"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      kind: "kube-job-notifier"
+  template:
+    metadata:
+      labels:
+        kind: "kube-job-notifier"
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+        runAsNonRoot: true
+      restartPolicy: Always
+      enableServiceLinks: false
+      serviceAccountName: kube-job-notifier
+      containers:
+        - name: "kube-job-notifier"
+          image: "kube-job-notifier"
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: GOMEMLIMIT
+              valueFrom:
+                resourceFieldRef:
+                  resource: requests.memory
+
+          resources:
+            limits:
+              memory: 128Mi
+            requests:
+              memory: 16Mi
