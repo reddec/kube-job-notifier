@@ -10,9 +10,10 @@ Inspired by prometheus and alertmanager.
 
 Designed (but not limited to) for [NTFY](https://ntfy.sh/).
 
-Supported:
+Supported upstreams (notification destinations):
 
 - webhooks
+- logger
 
 Example [rule config](#rules) (supports multiple document in single file):
 
@@ -21,31 +22,13 @@ Example [rule config](#rules) (supports multiple document in single file):
 # General webhook
 webhooks:
   - url: https://webhook.site/f4cbc7d5-5e81-4eca-b0b2-ca6bfa75025c
----
-# Integration with NTFY
-webhooks:
-  - url: https://ntfy.example.com/cron-jobs
-    headers:
-      Title: "{{or .Job.Labels.project .Job.Name}} failed"
-      Markdown: 'yes'
-      Priority: "high"
-      Tags': 'rotating_light'
-    body: |
-      {{range .Pods}}
-      ### Pod: {{.Name}}
-
-      ```
-      {{.Logs}}
-      ```
-
-      {{end}}
 ```
 
 ## Roadmap
 
 - [ ] SMTP (email) notification
 - [ ] NATS notification
-- [ ] Success notification
+- [ ] (maybe) success notification
 
 ## Deployment
 
@@ -87,13 +70,112 @@ Optional variables that in 99.99% are not required for production deployment
 
 ### Rules
 
+Rules are set of instructions what to watch and where to send notification.
 
-If body is not text, it will be treated as templated object: 
+Supported filters:
+
+- namespace
+- labels
+
+Supported upstreams:
+
+- webhook
+- logger
+
+Each rule is a YAML document stored in a single file. You may define multiple documents in one yaml file (using `---`
+separator).
+
+Rule has reasonable defaults, so minimal configuration will be:
+
+```yaml
+---
+webhooks:
+  - url: https://webhook.site/f4cbc7d5-5e81-4eca-b0b2-ca6bfa75025c
+```
+
+All notifications are delivered asynchronicity with individual in-memory queue. If notification failed it will be
+retried several times with fixed time interval.
+Queue is capped; if no notifications can be enqueued, new notifications will be dropped. Practically speaking it's
+possible only if system generates a lot of failed jobs and upstream is unhealthy.
+
+Configuration reference
+
+```yaml
+# Namespace to watch. If not set - all namespaces will be watched
+# Default: empty
+namespace: "<namespace>"
+
+# Labels to filter jobs. If not set - all jobs will be watched
+# Default: empty
+labels:
+  key: value
+  key2: value2
+
+# Upstreams configuration
+
+# Webhooks list of destinations
+# See webhooks section
+webhooks: [ ]
+
+# Logger list
+logger: [ ]
+```
+
+#### Webhook
+
+Deliver notification via HTTP request. If response code is not 2xx then operation will be marked as failed and new
+attempt will be done later.
+
+```yaml
+# Queue size: maximum number of notifications that can wait before processing.
+# Default: 100
+queue: 100
+
+# Maximum number of retries (in addition to first attempt).
+# Default: 5
+retries: 5
+
+# Interval between retries.
+# Default: 1s
+interval: 1s
+
+# URL of destination endpoint. REQUIRED.
+# Templates can be used (see template section).
+# URL may contain user:password section for basic auth if needed.
+# Default: empty
+url: "<URL>"
+
+# HTTP method to use. There is no validation on method, any HTTP method can be used.
+# Default: POST
+method: "POST"
+
+# HTTP headers to use.
+# Values can use templates (see template section). But keys can be only static.
+# Default: empty
+headers:
+  Content-Type: "text/plain"
+
+# Request payload (body). Can use complex templates (see template section).
+# Default: see bellow
+body: |
+  Job {{.Job.Name}}
+
+  {{range .Pods}}{{.Name}}
+
+  {{.Logs}}
+
+
+  {{end}}
+```
+
+If body is not text, it will be treated as templated object (see Telegram example):
+
 - every text field considered as template
 - it recursively applied for each item in array or record in map
 - object structure pre-reserved
+- header `Content-Type: application/json` will be set if the header wasn't set by config
 
-#### Examples
+##### Examples
 
 **NTFY**
 
@@ -147,6 +229,26 @@ webhooks:
 
 > Instead of setting token in plain text, set value as environment variable (ex: `TELEGRAM_TOKEN`) in deployment and
 > wire it via template function (ex: `url: https://api.telegram.org/bot{{env "TELEGRAM_TOKEN"}}/sendMessage`)
+
+#### Logger
+
+Send notification to logger. Used primarily for debugging.
+
+```yaml
+# Message to print
+# Default: see bellow
+message: |
+  Job {{.Job.Name}}
+
+  {{range .Pods}}{{.Name}}
+
+  {{.Logs}}
+
+
+  {{end}}
+```
+
+> `queue`, `retries` and `interval` can also be set for logger, but doesn't have any practical meaning.
 
 ### Template
 
@@ -207,7 +309,6 @@ Then run service
 ```bash
 go run main.go -C ~/.kube/config
 ```
-
 
 Normally, with KIND:
 
