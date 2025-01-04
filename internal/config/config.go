@@ -1,66 +1,40 @@
 package config
 
 import (
-	"net/http"
 	"time"
 
 	"gopkg.in/yaml.v3"
 )
 
 type Rule struct {
-	Namespace string              `yaml:"namespace,omitempty"`
-	Labels    map[string]string   `yaml:"labels,omitempty"`
-	Webhooks  []Upstream[Webhook] `yaml:"webhooks,omitempty"`
+	WatchConfig     `yaml:",inline"`
+	UpstreamsConfig map[string][]Upstream `yaml:",inline"`
 }
 
-type UpstreamConfig struct {
+type WatchConfig struct {
+	Namespace string            `yaml:"namespace,omitempty"`
+	Labels    map[string]string `yaml:"labels,omitempty"`
+}
+
+type Upstream struct {
 	Queue    int           `yaml:"queue,omitempty"`
 	Retries  int           `yaml:"retries,omitempty"`
 	Interval time.Duration `yaml:"interval,omitempty"`
+	Config   *yaml.Node    `yaml:"-"` // rest is for upstream specific config
 }
 
-type Upstream[T any] struct {
-	UpstreamConfig `yaml:",inline"`
-	Config         T `yaml:",inline"`
-}
-
-func (w *Upstream[T]) UnmarshalYAML(value *yaml.Node) error {
-	type alias Upstream[T]
+func (w *Upstream) UnmarshalYAML(value *yaml.Node) error {
+	type alias Upstream
 	var def = alias{
-		UpstreamConfig: UpstreamConfig{
-			Queue:    100,
-			Retries:  5,
-			Interval: time.Second,
-		},
-	}
-
-	// weired trick to mix static and dynamic dispatch
-	var r any = &def.Config
-	if v, ok := (r).(Reset); ok {
-		v.Reset()
+		Queue:    100,
+		Retries:  5,
+		Interval: time.Second,
 	}
 
 	if err := value.Decode(&def); err != nil {
 		return err
 	}
-	*w = Upstream[T](def)
+	def.Config = value
+	*w = Upstream(def)
 	return nil
-}
-
-type Reset interface {
-	Reset()
-}
-
-type Webhook struct {
-	URL     *Template            `yaml:"url"`
-	Method  string               `yaml:"method,omitempty"`
-	Headers map[string]*Template `yaml:"headers,omitempty"`
-	Body    ComplexTemplate      `yaml:"body,omitempty"`
-}
-
-func (w *Webhook) Reset() {
-	*w = Webhook{
-		Method: http.MethodPost,
-		Body:   MustComplexTemplate("Job {{.Job.Name}}\n\n{{range .Pods}}{{.Name}}\n\n{{.Logs}}\n\n\n{{end}}"),
-	}
 }

@@ -186,9 +186,11 @@ Requirements
 - GoReleaser
 - free will and desire to make life easier
 
+> TIP: in [test-env](test-env) there is Makefile which can do most things for you.
+
 Run locally:
 
-- Setup you kubernetes cluster.
+- Setup you kubernetes cluster or use [kind](https://kind.sigs.k8s.io/)
 - Setup webhook receiver. For example: https://webhook.site/#!/
 - Create **notify.yaml** file (it wil be ignored by git)
 
@@ -205,3 +207,13 @@ Then run service
 ```bash
 go run main.go -C ~/.kube/config
 ```
+
+
+Normally, with KIND:
+
+- in one terminal: `make -C test-env run` to run service
+- in another terminal: `make -C test-env trigger` to trigger failed job
+
+To cleanup:
+
+- `make -C test-env clean`

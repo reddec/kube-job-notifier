@@ -10,16 +10,31 @@ import (
 	"strings"
 
 	"github.com/reddec/kube-job-notifier/internal/config"
+	"github.com/reddec/kube-job-notifier/internal/upstreams"
 )
 
-func New(cfg config.Webhook) *Webhook {
+type Config struct {
+	URL     *config.Template            `yaml:"url"`
+	Method  string                      `yaml:"method,omitempty"`
+	Headers map[string]*config.Template `yaml:"headers,omitempty"`
+	Body    config.ComplexTemplate      `yaml:"body,omitempty"`
+}
+
+func Default() Config {
+	return Config{
+		Method: http.MethodPost,
+		Body:   config.MustComplexTemplate("Job {{.Job.Name}}\n\n{{range .Pods}}{{.Name}}\n\n{{.Logs}}\n\n\n{{end}}"),
+	}
+}
+
+func New(cfg Config) *Webhook {
 	return &Webhook{
 		config: cfg,
 	}
 }
 
 type Webhook struct {
-	config config.Webhook
+	config Config
 }
 
 func (w Webhook) Send(ctx context.Context, info *config.RenderContext) error {
@@ -78,4 +93,8 @@ func (w Webhook) Send(ctx context.Context, info *config.RenderContext) error {
 	errContent, _ := io.ReadAll(io.LimitReader(resp.Body, peekReply))
 
 	return fmt.Errorf("send request: status %d, body: %s", resp.StatusCode, string(errContent))
+}
+
+func Register(loader *upstreams.Loader) {
+	upstreams.Register[Config](loader, "webhook", Default, New)
 }

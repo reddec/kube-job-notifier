@@ -36,6 +36,10 @@ docker_manifests:
     image_templates:
       - "ghcr.io/reddec/{{ .ProjectName }}:{{ .Version }}-amd64"
       - "ghcr.io/reddec/{{ .ProjectName }}:{{ .Version }}-arm64v8"
+  - name_template: "ghcr.io/reddec/{{ .ProjectName }}:latest"
+    image_templates:
+      - "ghcr.io/reddec/{{ .ProjectName }}:{{ .Version }}-amd64"
+      - "ghcr.io/reddec/{{ .ProjectName }}:{{ .Version }}-arm64v8"
 changelog:
   sort: asc
   filters:

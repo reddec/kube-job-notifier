@@ -1,0 +1,12 @@
+---
+logger:
+  - message: |
+      {{or .Job.Labels.project .Job.Name}} failed
+      {{range .Pods}}
+      ### Pod: {{.Name}}
+
+      ```
+      {{.Logs}}
+      ```
+
+      {{end}}

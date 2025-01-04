@@ -8,7 +8,6 @@ import (
 	"log/slog"
 
 	"github.com/hashicorp/golang-lru/simplelru"
-	"github.com/sourcegraph/conc/pool"
 	v2 "k8s.io/api/batch/v1"
 	v3 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,7 +17,6 @@ import (
 
 	"github.com/reddec/kube-job-notifier/internal/config"
 	"github.com/reddec/kube-job-notifier/internal/upstreams"
-	"github.com/reddec/kube-job-notifier/internal/upstreams/webhook"
 )
 
 type Config struct {
@@ -28,39 +26,29 @@ type Config struct {
 	SkipPreload bool  `long:"skip-preload" env:"SKIP_PRELOAD" description:"Skip preloading existing jobs. May cause duplicates in notifications after restart"`
 }
 
-func New(cfg Config, rule config.Rule, clientset *kubernetes.Clientset) *Engine {
+func New[T upstreams.Upstream](cfg Config, rule config.WatchConfig, upstreams []T, clientset *kubernetes.Clientset) *Engine[T] {
 	cache, err := simplelru.NewLRU(cfg.DedupCache, nil)
 	if err != nil {
 		panic(err)
 	}
-	return &Engine{
+	return &Engine[T]{
 		rule:      rule,
+		outputs:   upstreams,
 		cfg:       cfg,
 		clientset: clientset,
 		cache:     cache,
 	}
 }
 
-type Engine struct {
+type Engine[T upstreams.Upstream] struct {
 	cfg       Config
-	rule      config.Rule
+	rule      config.WatchConfig
 	clientset *kubernetes.Clientset
 	cache     simplelru.LRUCache
+	outputs   []T
 }
 
-func (e *Engine) Run(ctx context.Context) error {
-	wg := pool.New().WithContext(ctx).WithCancelOnError()
-
-	outputs := e.createUpstreams(wg)
-
-	wg.Go(func(ctx context.Context) error {
-		return e.watchJobs(ctx, outputs)
-	})
-
-	return wg.Wait()
-}
-
-func (e *Engine) watchJobs(ctx context.Context, outputs []upstreams.Upstream) error {
+func (e *Engine[T]) Run(ctx context.Context) error {
 	var labelsFilter string
 	if len(e.rule.Labels) > 0 {
 		labelsFilter = labels.FormatLabels(e.rule.Labels)
@@ -100,7 +88,7 @@ func (e *Engine) watchJobs(ctx context.Context, outputs []upstreams.Upstream) er
 					continue
 				}
 
-				if err := e.inspectJob(ctx, job, outputs); err != nil {
+				if err := e.inspectJob(ctx, job); err != nil {
 					slog.Warn("inspect job failed", "job", job.Name, "error", err)
 				}
 			}
@@ -108,7 +96,7 @@ func (e *Engine) watchJobs(ctx context.Context, outputs []upstreams.Upstream) er
 	}
 }
 
-func (e *Engine) preloadJobs(ctx context.Context, options v1.ListOptions) error {
+func (e *Engine[T]) preloadJobs(ctx context.Context, options v1.ListOptions) error {
 	slog.Info("preloading jobs to avoid sending old notifications")
 	cp := options
 	cp.Watch = false
@@ -127,7 +115,7 @@ func (e *Engine) preloadJobs(ctx context.Context, options v1.ListOptions) error 
 	return nil
 }
 
-func (e *Engine) inspectJob(ctx context.Context, job *v2.Job, outputs []upstreams.Upstream) error {
+func (e *Engine[T]) inspectJob(ctx context.Context, job *v2.Job) error {
 	if job.Status.Failed == 0 {
 		return nil
 	}
@@ -149,28 +137,14 @@ func (e *Engine) inspectJob(ctx context.Context, job *v2.Job, outputs []upstream
 		Pods: pods,
 	}
 	var errList []error
-	for _, upstream := range outputs {
+	for _, upstream := range e.outputs {
 		errList = append(errList, upstream.Send(ctx, renderCtx))
 	}
 	slog.Info("notifications enqueued", "job", job.Name, "namespace", job.Namespace)
 	return errors.Join(errList...)
 }
 
-func (e *Engine) createUpstreams(wg *pool.ContextPool) []upstreams.Upstream {
-	var all []upstreams.Upstream
-
-	// initialize all upstreams here
-
-	// webhooks
-	for _, wh := range e.rule.Webhooks {
-		up := upstreams.NewAsync(wh.UpstreamConfig, webhook.New(wh.Config))
-		wg.Go(up.Run)
-		all = append(all, up)
-	}
-	return all
-}
-
-func (e *Engine) fetchPods(ctx context.Context, job *v2.Job) ([]config.Pod, error) {
+func (e *Engine[T]) fetchPods(ctx context.Context, job *v2.Job) ([]config.Pod, error) {
 	pods, err := e.clientset.CoreV1().Pods(e.rule.Namespace).List(ctx, v1.ListOptions{
 		LabelSelector: "job-name=" + job.Name,
 	})
@@ -193,7 +167,7 @@ func (e *Engine) fetchPods(ctx context.Context, job *v2.Job) ([]config.Pod, erro
 	return out, nil
 }
 
-func (e *Engine) fetchLogs(ctx context.Context, pod *v3.Pod) (string, error) {
+func (e *Engine[T]) fetchLogs(ctx context.Context, pod *v3.Pod) (string, error) {
 	logsRes := e.clientset.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &v3.PodLogOptions{
 		TailLines: &e.cfg.Tail,
 	})

@@ -15,6 +15,9 @@ import (
 
 	"github.com/reddec/kube-job-notifier/internal/config"
 	"github.com/reddec/kube-job-notifier/internal/engine"
+	"github.com/reddec/kube-job-notifier/internal/upstreams"
+	"github.com/reddec/kube-job-notifier/internal/upstreams/logger"
+	"github.com/reddec/kube-job-notifier/internal/upstreams/webhook"
 )
 
 type Config struct {
@@ -39,6 +42,11 @@ func main() {
 }
 
 func run(cfg Config) error {
+	var loader upstreams.Loader
+
+	webhook.Register(&loader)
+	logger.Register(&loader)
+
 	rules, err := config.Load(cfg.Config)
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
@@ -59,7 +67,20 @@ func run(cfg Config) error {
 	var wg = pool.New().WithContext(ctx).WithCancelOnError()
 
 	for i, rule := range rules {
-		inst := engine.New(cfg.Engine, rule, clientset)
+
+		ups, err := loader.Build(rule.UpstreamsConfig)
+		if err != nil {
+			cancel()
+			return fmt.Errorf("loading upstreams: %w", err)
+		}
+
+		// start upstreams
+		for _, up := range ups {
+			slog.Info("starting upstream", "rule_idx", i, "kind", up.Kind())
+			wg.Go(up.Run)
+		}
+
+		inst := engine.New(cfg.Engine, rule.WatchConfig, ups, clientset)
 		slog.Info("started rule", "rule_idx", i)
 		wg.Go(inst.Run)
 	}

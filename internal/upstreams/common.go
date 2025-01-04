@@ -13,18 +13,12 @@ type Upstream interface {
 	Send(ctx context.Context, info *config.RenderContext) error
 }
 
-func NewAsync(cfg config.UpstreamConfig, next Upstream) *AsyncUpstream {
-	return &AsyncUpstream{
-		queue: make(chan *config.RenderContext, cfg.Queue),
-		next:  next,
-		cfg:   cfg,
-	}
-}
-
 type AsyncUpstream struct {
-	queue chan *config.RenderContext
-	cfg   config.UpstreamConfig
-	next  Upstream
+	queue    chan *config.RenderContext
+	retries  int
+	interval time.Duration
+	kind     string
+	next     Upstream
 }
 
 func (au *AsyncUpstream) Send(ctx context.Context, info *config.RenderContext) error {
@@ -53,18 +47,22 @@ func (au *AsyncUpstream) Run(ctx context.Context) error {
 	}
 }
 
+func (au *AsyncUpstream) Kind() string {
+	return au.kind
+}
+
 func (au *AsyncUpstream) sendMessage(ctx context.Context, info *config.RenderContext) error {
-	for i := 0; i <= au.cfg.Retries; i++ {
+	for i := 0; i <= au.retries; i++ {
 		err := au.next.Send(ctx, info)
 		if err == nil {
 			return nil
 		}
-		slog.Error("attempt failed to send message", "attempt", i+1, "retries", au.cfg.Retries, "error", err)
-		if i < au.cfg.Retries {
+		slog.Error("attempt failed to send message", "attempt", i+1, "retries", au.retries, "error", err)
+		if i < au.retries {
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
-			case <-time.After(au.cfg.Interval):
+			case <-time.After(au.interval):
 			}
 		}
 	}
