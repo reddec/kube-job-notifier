@@ -40,4 +40,5 @@ func (lg *Logger) Send(ctx context.Context, info *config.RenderContext) error {
 
 func Register(loader *upstreams.Loader) {
 	upstreams.Register[Config](loader, "logger", Default, New)
+	upstreams.Register[Config](loader, "loggers", Default, New)
 }

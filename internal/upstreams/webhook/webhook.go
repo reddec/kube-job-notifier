@@ -97,4 +97,5 @@ func (w Webhook) Send(ctx context.Context, info *config.RenderContext) error {
 
 func Register(loader *upstreams.Loader) {
 	upstreams.Register[Config](loader, "webhook", Default, New)
+	upstreams.Register[Config](loader, "webhooks", Default, New)
 }
